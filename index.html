@@ -1,0 +1,712 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>ETFnow 대시보드</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --panel2: #1f2937;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --border: #374151;
+      --accent: #60a5fa;
+      --danger: #f87171;
+      --good: #f87171;
+      --bad: #60a5fa;
+      --flat: #d1d5db;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(15, 23, 42, 0.95);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 12px;
+      backdrop-filter: blur(8px);
+    }
+
+    h1 {
+      font-size: 20px;
+      margin: 0 0 10px;
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    input, button {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 15px;
+    }
+
+    input {
+      background: #020617;
+      color: var(--text);
+      min-width: 0;
+    }
+
+    button {
+      background: var(--panel2);
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    button.primary {
+      background: #1d4ed8;
+      border-color: #2563eb;
+    }
+
+    button.danger {
+      color: #fecaca;
+      border-color: #7f1d1d;
+      background: #450a0a;
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    #workerUrl {
+      flex: 1 1 280px;
+    }
+
+    #etfCode {
+      flex: 1 1 140px;
+      text-transform: uppercase;
+    }
+
+    main {
+      padding: 12px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .notice {
+      color: var(--muted);
+      font-size: 13px;
+      margin: 8px 0 12px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      margin: 12px 0;
+      overflow: hidden;
+    }
+
+    .card-head {
+      padding: 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .title {
+      font-weight: 800;
+      font-size: 17px;
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 3px;
+    }
+
+    .price {
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .price strong {
+      font-size: 19px;
+    }
+
+    .rising { color: var(--good); }
+    .falling { color: var(--bad); }
+    .flat { color: var(--flat); }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1px;
+      background: var(--border);
+    }
+
+    .cell {
+      background: var(--panel);
+      padding: 11px 12px;
+    }
+
+    .label {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 3px;
+    }
+
+    .value {
+      font-weight: 700;
+      word-break: keep-all;
+    }
+
+    .summary {
+      padding: 12px;
+      color: #d1d5db;
+      border-top: 1px solid var(--border);
+      font-size: 14px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .holdings {
+      display: none;
+      border-top: 1px solid var(--border);
+      overflow-x: auto;
+    }
+
+    .holdings.open {
+      display: block;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 760px;
+    }
+
+    th, td {
+      padding: 10px 9px;
+      border-bottom: 1px solid var(--border);
+      text-align: right;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    th:first-child, td:first-child,
+    th:nth-child(2), td:nth-child(2) {
+      text-align: left;
+    }
+
+    th {
+      color: var(--muted);
+      background: #0b1220;
+      position: sticky;
+      top: 0;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .empty {
+      text-align: center;
+      color: var(--muted);
+      padding: 40px 12px;
+    }
+
+    @media (min-width: 720px) {
+      .grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>ETFnow 대시보드</h1>
+    <div class="row">
+      <input id="workerUrl" placeholder="Cloudflare Worker URL 예: https://xxx.workers.dev" />
+      <button id="saveWorkerBtn">저장</button>
+    </div>
+    <div class="row" style="margin-top:8px;">
+      <input id="etfCode" placeholder="ETF 코드 예: 0167A0" />
+      <button id="addBtn" class="primary">추가</button>
+      <button id="refreshBtn">새로고침</button>
+      <button id="exportBtn">JSON 내보내기</button>
+      <button id="clearBtn" class="danger">전체삭제</button>
+    </div>
+    <div id="status" class="notice"></div>
+  </header>
+
+  <main>
+    <div class="notice">
+      기본 저장 위치는 이 브라우저의 localStorage입니다. 모바일/PC는 각각 따로 저장됩니다.
+    </div>
+    <section id="list"></section>
+  </main>
+
+  <script>
+    const STORAGE_CODES = "etfnow_dashboard_codes_v1";
+    const STORAGE_WORKER = "etfnow_dashboard_worker_url_v1";
+
+    const els = {
+      workerUrl: document.getElementById("workerUrl"),
+      etfCode: document.getElementById("etfCode"),
+      saveWorkerBtn: document.getElementById("saveWorkerBtn"),
+      addBtn: document.getElementById("addBtn"),
+      refreshBtn: document.getElementById("refreshBtn"),
+      exportBtn: document.getElementById("exportBtn"),
+      clearBtn: document.getElementById("clearBtn"),
+      status: document.getElementById("status"),
+      list: document.getElementById("list"),
+    };
+
+    let state = {
+      codes: loadCodes(),
+      data: {},
+      loading: false,
+    };
+
+    init();
+
+    function init() {
+      els.workerUrl.value = localStorage.getItem(STORAGE_WORKER) || "";
+      bindEvents();
+
+      if (state.codes.length === 0) {
+        state.codes = ["0167A0"];
+        saveCodes();
+      }
+
+      render();
+      refreshAll();
+    }
+
+    function bindEvents() {
+      els.saveWorkerBtn.addEventListener("click", () => {
+        localStorage.setItem(STORAGE_WORKER, normalizeWorkerUrl(els.workerUrl.value));
+        els.workerUrl.value = localStorage.getItem(STORAGE_WORKER);
+        setStatus("Worker URL 저장 완료");
+      });
+
+      els.addBtn.addEventListener("click", addCode);
+      els.etfCode.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") addCode();
+      });
+
+      els.refreshBtn.addEventListener("click", refreshAll);
+
+      els.exportBtn.addEventListener("click", () => {
+        const payload = {
+          exportedAt: new Date().toISOString(),
+          workerUrl: localStorage.getItem(STORAGE_WORKER) || "",
+          codes: state.codes,
+          data: state.data,
+        };
+        downloadJson(payload, "etfnow-dashboard-export.json");
+      });
+
+      els.clearBtn.addEventListener("click", () => {
+        if (!confirm("ETF 목록을 전체 삭제할까요?")) return;
+        state.codes = [];
+        state.data = {};
+        saveCodes();
+        render();
+      });
+    }
+
+    function addCode() {
+      const code = normalizeCode(els.etfCode.value);
+      if (!code) {
+        setStatus("ETF 코드를 입력하세요.");
+        return;
+      }
+
+      if (state.codes.includes(code)) {
+        setStatus("이미 추가된 ETF입니다.");
+        return;
+      }
+
+      state.codes.push(code);
+      saveCodes();
+      els.etfCode.value = "";
+      render();
+      refreshOne(code);
+    }
+
+    function removeCode(code) {
+      state.codes = state.codes.filter((x) => x !== code);
+      delete state.data[code];
+      saveCodes();
+      render();
+    }
+
+    async function refreshAll() {
+      if (state.loading) return;
+      if (state.codes.length === 0) {
+        render();
+        return;
+      }
+
+      setLoading(true);
+      setStatus("조회 중...");
+
+      try {
+        for (const code of state.codes) {
+          await refreshOne(code, { silent: true });
+        }
+        setStatus("조회 완료: " + new Date().toLocaleString("ko-KR"));
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function refreshOne(code, options = {}) {
+      const worker = normalizeWorkerUrl(els.workerUrl.value || localStorage.getItem(STORAGE_WORKER) || "");
+      if (!worker) {
+        setStatus("Cloudflare Worker URL을 먼저 입력하세요.");
+        return;
+      }
+
+      try {
+        if (!options.silent) setStatus(`${code} 조회 중...`);
+        const url = `${worker}/api/etf/${encodeURIComponent(code)}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+
+        if (!json.ok) {
+          throw new Error(json.error || "Worker 응답 오류");
+        }
+
+        state.data[code] = json;
+        render();
+
+        if (!options.silent) {
+          setStatus(`${code} 조회 완료`);
+        }
+      } catch (err) {
+        state.data[code] = {
+          ok: false,
+          code,
+          error: String(err.message || err),
+        };
+        render();
+        setStatus(`${code} 조회 실패: ${err.message || err}`);
+      }
+    }
+
+    function render() {
+      if (state.codes.length === 0) {
+        els.list.innerHTML = `<div class="empty">추가된 ETF가 없습니다.</div>`;
+        return;
+      }
+
+      els.list.innerHTML = state.codes.map((code) => renderCard(code, state.data[code])).join("");
+
+      for (const btn of els.list.querySelectorAll("[data-action='remove']")) {
+        btn.addEventListener("click", () => removeCode(btn.dataset.code));
+      }
+
+      for (const btn of els.list.querySelectorAll("[data-action='refresh']")) {
+        btn.addEventListener("click", () => refreshOne(btn.dataset.code));
+      }
+
+      for (const btn of els.list.querySelectorAll("[data-action='toggle']")) {
+        btn.addEventListener("click", () => {
+          const box = document.getElementById(`holdings-${btn.dataset.code}`);
+          if (!box) return;
+          box.classList.toggle("open");
+          btn.textContent = box.classList.contains("open") ? "구성종목 닫기" : "구성종목 보기";
+        });
+      }
+    }
+
+    function renderCard(code, payload) {
+      if (!payload) {
+        return `
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <div class="title">${escapeHtml(code)}</div>
+                <div class="sub">아직 조회 전</div>
+              </div>
+            </div>
+            ${renderActions(code)}
+          </article>
+        `;
+      }
+
+      if (!payload.ok) {
+        return `
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <div class="title">${escapeHtml(code)}</div>
+                <div class="sub">조회 실패</div>
+              </div>
+            </div>
+            <div class="summary">${escapeHtml(payload.error || "알 수 없는 오류")}</div>
+            ${renderActions(code)}
+          </article>
+        `;
+      }
+
+      const b = payload.basic || {};
+      const h = payload.holdings || {};
+      const holdings = Array.isArray(h.holdings) ? h.holdings : [];
+      const priceClass = priceDirectionClass(b.compareToPreviousPrice && b.compareToPreviousPrice.name);
+      const diffText = `${b.compareToPreviousClosePrice || "-"} (${b.fluctuationsRatio || "-"}%)`;
+
+      return `
+        <article class="card">
+          <div class="card-head">
+            <div>
+              <div class="title">${escapeHtml(b.stockName || code)}</div>
+              <div class="sub">
+                ${escapeHtml(b.itemCode || code)}
+                · ${escapeHtml(b.issuerName || "-")}
+                · ${escapeHtml(b.stockExchangeName || "-")}
+                · ${escapeHtml(b.delayTimeName || "-")}
+              </div>
+            </div>
+            <div class="price">
+              <strong>${escapeHtml(b.closePrice || "-")}</strong>
+              <div class="${priceClass}">${escapeHtml(diffText)}</div>
+            </div>
+          </div>
+
+          <div class="grid">
+            ${kv("iNAV", b.iNav)}
+            ${kv("NAV", b.nav)}
+            ${kv("괴리율", formatDeviation(b.deviationSign, b.deviationRate))}
+            ${kv("거래량", b.accumulatedTradingVolume)}
+            ${kv("거래대금", b.accumulatedTradingValue)}
+            ${kv("시가총액", b.marketValue)}
+            ${kv("순자산", b.totalNav)}
+            ${kv("총보수", addSuffix(b.totalFee, "%"))}
+            ${kv("1주 수익률", addSuffix(b.returnRate1w, "%"), signedClass(b.returnRate1w))}
+            ${kv("1개월 수익률", addSuffix(b.returnRate1m, "%"), signedClass(b.returnRate1m))}
+            ${kv("52주 고가", b.highPriceOf52Weeks)}
+            ${kv("52주 저가", b.lowPriceOf52Weeks)}
+          </div>
+
+          ${renderSummary(b, h)}
+
+          ${renderActions(code, holdings.length)}
+
+          <div id="holdings-${escapeAttr(code)}" class="holdings">
+            ${renderHoldings(holdings)}
+          </div>
+        </article>
+      `;
+    }
+
+    function renderSummary(b, h) {
+      const digest = b.etfDigest || {};
+      const theme = b.etfTheme || {};
+      const nav = h.nav_prediction || {};
+      return `
+        <div class="summary">
+          <div><strong>요약:</strong> ${escapeHtml(digest.summary || b.etfSummary || "-")}</div>
+          <div style="margin-top:6px;">
+            <strong>주요 테마:</strong> ${escapeHtml(theme.primary_theme_display || theme.primary_theme || "-")}
+          </div>
+          <div style="margin-top:6px;">
+            <strong>구성종목:</strong> ${escapeHtml(String(h.total_count || "-"))}개,
+            <strong>총 비중:</strong> ${escapeHtml(String(h.total_weight ?? "-"))}%,
+            <strong>예상 iNAV:</strong> ${escapeHtml(String(nav.inav_krw_estimated ?? "-"))}
+          </div>
+          <div style="margin-top:6px;color:var(--muted);">
+            기준시각: ${escapeHtml(h.timestamp || b.localTradedAt || "-")}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderActions(code, holdingsCount = 0) {
+      return `
+        <div class="actions">
+          <button data-action="refresh" data-code="${escapeAttr(code)}">개별 새로고침</button>
+          <button data-action="toggle" data-code="${escapeAttr(code)}">구성종목 보기${holdingsCount ? ` (${holdingsCount})` : ""}</button>
+          <button data-action="remove" data-code="${escapeAttr(code)}" class="danger">삭제</button>
+        </div>
+      `;
+    }
+
+    function renderHoldings(holdings) {
+      if (!holdings.length) {
+        return `<div class="empty">구성종목 데이터가 없습니다.</div>`;
+      }
+
+      const rows = holdings
+        .slice()
+        .sort((a, b) => Number(b.weight || 0) - Number(a.weight || 0))
+        .map((x) => {
+          const name = x.name_ko || x.classification_name_ko || "-";
+          const ticker = x.ticker || x.reuters_code || "";
+          const price = x.price == null ? "-" : formatNumber(x.price);
+          const prevClose = x.prev_close == null ? "-" : formatNumber(x.prev_close);
+          const weight = x.weight == null ? "-" : `${x.weight}%`;
+          const changePct = x.change_pct == null ? "-" : `${x.change_pct}%`;
+          const afterClose = x.after_close_change_pct == null ? "-" : `${x.after_close_change_pct}%`;
+          const inavChange = x.inav_change_pct == null ? "-" : `${x.inav_change_pct}%`;
+          const theme = x.primary_theme || "-";
+          const currency = x.display_currency || "-";
+          const session = x.session_type || "-";
+          const cls = signedClass(x.change_pct);
+
+          return `
+            <tr>
+              <td>${escapeHtml(ticker)}</td>
+              <td>${escapeHtml(name)}</td>
+              <td>${escapeHtml(weight)}</td>
+              <td>${escapeHtml(price)}</td>
+              <td>${escapeHtml(prevClose)}</td>
+              <td class="${cls}">${escapeHtml(changePct)}</td>
+              <td class="${signedClass(x.after_close_change_pct)}">${escapeHtml(afterClose)}</td>
+              <td class="${signedClass(x.inav_change_pct)}">${escapeHtml(inavChange)}</td>
+              <td>${escapeHtml(currency)}</td>
+              <td>${escapeHtml(session)}</td>
+              <td>${escapeHtml(theme)}</td>
+            </tr>
+          `;
+        })
+        .join("");
+
+      return `
+        <table>
+          <thead>
+            <tr>
+              <th>코드</th>
+              <th>종목명</th>
+              <th>비중</th>
+              <th>현재가</th>
+              <th>전일종가</th>
+              <th>등락률</th>
+              <th>장후변동</th>
+              <th>iNAV기여</th>
+              <th>통화</th>
+              <th>세션</th>
+              <th>테마</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    }
+
+    function kv(label, value, cls = "") {
+      return `
+        <div class="cell">
+          <div class="label">${escapeHtml(label)}</div>
+          <div class="value ${cls}">${escapeHtml(value == null || value === "" ? "-" : String(value))}</div>
+        </div>
+      `;
+    }
+
+    function loadCodes() {
+      try {
+        const raw = localStorage.getItem(STORAGE_CODES);
+        const list = raw ? JSON.parse(raw) : [];
+        return Array.isArray(list) ? list.map(normalizeCode).filter(Boolean) : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveCodes() {
+      localStorage.setItem(STORAGE_CODES, JSON.stringify(state.codes));
+    }
+
+    function normalizeCode(value) {
+      return String(value || "").trim().toUpperCase();
+    }
+
+    function normalizeWorkerUrl(value) {
+      return String(value || "").trim().replace(/\/+$/, "");
+    }
+
+    function setStatus(msg) {
+      els.status.textContent = msg || "";
+    }
+
+    function setLoading(value) {
+      state.loading = value;
+      els.refreshBtn.disabled = value;
+      els.addBtn.disabled = value;
+    }
+
+    function priceDirectionClass(name) {
+      if (name === "RISING") return "rising";
+      if (name === "FALLING") return "falling";
+      return "flat";
+    }
+
+    function signedClass(value) {
+      const n = Number(value);
+      if (Number.isNaN(n)) return "";
+      if (n > 0) return "rising";
+      if (n < 0) return "falling";
+      return "flat";
+    }
+
+    function formatDeviation(sign, value) {
+      if (value == null || value === "") return "-";
+      return `${sign || ""}${value}%`;
+    }
+
+    function addSuffix(value, suffix) {
+      if (value == null || value === "") return "-";
+      return `${value}${suffix}`;
+    }
+
+    function formatNumber(value) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return String(value);
+      return n.toLocaleString("ko-KR");
+    }
+
+    function downloadJson(payload, filename) {
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function escapeAttr(value) {
+      return escapeHtml(value);
+    }
+  </script>
+</body>
+</html>
